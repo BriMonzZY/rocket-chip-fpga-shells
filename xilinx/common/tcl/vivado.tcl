@@ -9,6 +9,8 @@ source [file join $scriptdir "prologue.tcl"]
 # Initialize Vivado project files
 source [file join $scriptdir "init.tcl"]
 
+set_param general.maxThreads 8
+
 # Synthesize the design
 source [file join $scriptdir "synth.tcl"]
 

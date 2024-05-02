@@ -71,12 +71,12 @@ class SDIOVCU108PlacedOverlay(val shell: VCU108ShellBasicOverlays, name: String,
   extends SDIOXilinxPlacedOverlay(name, designInput, shellInput)
 {
   shell { InModuleBody {
-    val packagePinsWithPackageIOs = Seq(("BB16", IOPin(io.spi_clk)),
+    val packagePinsWithPackageIOs = Seq(("BF7", IOPin(io.spi_clk)),
             ("BA10", IOPin(io.spi_cs)),
             ("AW16", IOPin(io.spi_dat(0))),
-            ("BC13", IOPin(io.spi_dat(1))),
-            ("BF7", IOPin(io.spi_dat(2))),
-            ("BC14", IOPin(io.spi_dat(3))))
+            ("AW12", IOPin(io.spi_dat(1))),
+            ("BC14", IOPin(io.spi_dat(2))),
+            ("BC13", IOPin(io.spi_dat(3))))
 
     packagePinsWithPackageIOs foreach { case (pin, io) => {
       shell.xdc.addPackagePin(io, pin)
