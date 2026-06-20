@@ -4,7 +4,7 @@
 `define RESET_SYNC 4
 `define DEBOUNCE_BITS 8
 
-module vcu118reset(
+module vcu108reset(
   // Asynchronous reset input, should be held high until
   // all clocks are locked and power is stable.
   input  wire areset,

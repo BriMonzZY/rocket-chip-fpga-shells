@@ -349,6 +349,25 @@ class vcu118reset() extends BlackBox
 }
 
 //-------------------------------------------------------------------------
+// vcu108reset
+//-------------------------------------------------------------------------
+
+class vcu108reset() extends BlackBox
+{
+  val io = IO(new Bundle{
+    val areset = Input(Bool())
+    val clock1 = Input(Clock())
+    val reset1 = Output(Bool())
+    val clock2 = Input(Clock())
+    val reset2 = Output(Bool())
+    val clock3 = Input(Clock())
+    val reset3 = Output(Bool())
+    val clock4 = Input(Clock())
+    val reset4 = Output(Bool())
+  })
+}
+
+//-------------------------------------------------------------------------
 // sdio_spi_bridge
 //-------------------------------------------------------------------------
 

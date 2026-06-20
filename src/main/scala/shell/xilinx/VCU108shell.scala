@@ -1,23 +1,5 @@
 package sifive.fpgashells.shell.xilinx
 
-// import chisel3._
-// import chisel3.experimental.{attach, Analog, IO}
-// import freechips.rocketchip.diplomacy._
-// import freechips.rocketchip.tilelink._
-// import freechips.rocketchip.util.SyncResetSynchronizerShiftReg
-// import sifive.fpgashells.clocks._
-// import sifive.fpgashells.shell._
-// import sifive.fpgashells.ip.xilinx._
-// import sifive.blocks.devices.chiplink._
-// import sifive.fpgashells.devices.xilinx.xilinxvcu118mig._
-// import sifive.fpgashells.devices.xilinx.xdma._
-// import sifive.fpgashells.ip.xilinx.xxv_ethernet._
-
-// import chisel3.experimental.dataview._
-// import freechips.rocketchip.prci._
-// import org.chipsalliance.cde.config._
-// import sifive.fpgashells.ip.xilinx.vcu118mig._
-
 import chisel3._
 import chisel3.experimental.{Analog, attach}
 import chisel3.experimental.dataview._
@@ -26,10 +8,10 @@ import freechips.rocketchip.prci._
 import org.chipsalliance.cde.config._
 import sifive.fpgashells.clocks._
 import sifive.fpgashells.devices.xilinx.xdma._
-import sifive.fpgashells.devices.xilinx.xilinxvcu118mig._
+import sifive.fpgashells.devices.xilinx.xilinxvcu108mig._
 import sifive.fpgashells.ip.xilinx._
 import sifive.fpgashells.ip.xilinx.xxv_ethernet._
-import sifive.fpgashells.ip.xilinx.vcu118mig._
+import sifive.fpgashells.ip.xilinx.vcu108mig._
 import sifive.fpgashells.shell._
 
 class SysClockVCU108PlacedOverlay(val shell: VCU108ShellBasicOverlays, name: String, val designInput: ClockInputDesignInput, val shellInput: ClockInputShellInput)
@@ -45,7 +27,7 @@ class SysClockVCU108PlacedOverlay(val shell: VCU108ShellBasicOverlays, name: Str
   } }
 }
 class SysClockVCU108ShellPlacer(shell: VCU108ShellBasicOverlays, val shellInput: ClockInputShellInput)(implicit val valName: ValName)
-  extends ClockInputShellPlacer[VCU118ShellBasicOverlays]
+  extends ClockInputShellPlacer[VCU108ShellBasicOverlays]
 {
   def place(designInput: ClockInputDesignInput) = new SysClockVCU108PlacedOverlay(shell, valName.name, designInput, shellInput)
 }
@@ -165,7 +147,7 @@ class QSFP1VCU108ShellPlacer(shell: VCU108ShellBasicOverlays, val shellInput: Et
   extends EthernetShellPlacer[VCU108ShellBasicOverlays] {
   def place(designInput: EthernetDesignInput) = new QSFP1VCU108PlacedOverlay(shell, valName.name, designInput, shellInput)
 }
-//VCU 108 do not have QSFP2
+// VCU108 does not have QSFP2; this overlay is intentionally not registered by VCU108ShellBasicOverlays.
 class QSFP2VCU108PlacedOverlay(val shell: VCU108ShellBasicOverlays, name: String, val designInput: EthernetDesignInput, val shellInput: EthernetShellInput)
   extends EthernetUltraScalePlacedOverlay(name, designInput, shellInput, XXVEthernetParams(name = name, speed   = 10, dclkMHz = 125))
 {
@@ -325,14 +307,13 @@ class JTAGDebugBScanVCU108ShellPlacer(val shell: VCU108ShellBasicOverlays, val s
 }
 
 case object VCU108DDRSize extends Field[BigInt](0x40000000L * 2) // 2GB
-//fpga-shells/src/main/scala/devices/xilinx/xilinxvcu118mig/XilinxVCU118MIG.scala
 class DDRVCU108PlacedOverlay(val shell: VCU108ShellBasicOverlays, name: String, val designInput: DDRDesignInput, val shellInput: DDRShellInput)
-  extends DDRPlacedOverlay[XilinxVCU118MIGPads](name, designInput, shellInput)
+  extends DDRPlacedOverlay[XilinxVCU108MIGPads](name, designInput, shellInput)
 {
   val size = p(VCU108DDRSize)
 
-  val migParams = XilinxVCU118MIGParams(address = AddressSet.misaligned(di.baseAddress, size))
-  val mig = LazyModule(new XilinxVCU118MIG(migParams))
+  val migParams = XilinxVCU108MIGParams(address = AddressSet.misaligned(di.baseAddress, size))
+  val mig = LazyModule(new XilinxVCU108MIG(migParams))
   val ioNode = BundleBridgeSource(() => mig.module.io.cloneType)
   // val topIONode = shell { ioNode.makeSink() }
   val ddrUI     = shell { ClockSourceNode(freqMHz = 200) }
@@ -340,7 +321,7 @@ class DDRVCU108PlacedOverlay(val shell: VCU108ShellBasicOverlays, name: String, 
   areset := designInput.wrangler := ddrUI
 
   def overlayOutput = DDROverlayOutput(ddr = mig.node)
-  def ioFactory = new XilinxVCU118MIGPads(size)
+  def ioFactory = new XilinxVCU108MIGPads(size)
 
   // InModuleBody { ioNode.bundle <> mig.module.io }
 
@@ -352,7 +333,7 @@ class DDRVCU108PlacedOverlay(val shell: VCU108ShellBasicOverlays, name: String, 
     // val port = topIONode.bundle.port
     // io <> port
     val port = mig.module.io.port
-    io <> port.viewAsSupertype(new VCU118MIGIODDR(mig.depth))
+    io <> port.viewAsSupertype(new VCU108MIGIODDR(mig.depth))
     ui.clock := port.c0_ddr4_ui_clk
     ui.reset := /*!port.mmcm_locked ||*/ port.c0_ddr4_ui_clk_sync_rst
     port.c0_sys_clk_i := sys.clock.asUInt
