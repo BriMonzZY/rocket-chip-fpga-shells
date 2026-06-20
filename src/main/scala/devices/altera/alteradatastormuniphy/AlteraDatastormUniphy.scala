@@ -1,4 +1,4 @@
-package sifive.fpgashells.devices.xilinx.xilinxnexysvideomig
+package sifive.fpgashells.devices.altera.altera_datastorm_uniphy
 
 import chisel3._
 import chisel3.experimental.attach
@@ -8,26 +8,34 @@ import freechips.rocketchip.prci._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.tilelink._
 import org.chipsalliance.cde.config.Parameters
-import sifive.fpgashells.ip.xilinx.nexysvideomig.{NexysVideoMIGIOClocksReset, NexysVideoMIGIODDR, nexysvideomig}
+import sifive.fpgashells.ip.altera.datastorm_uniphy.{DatastormUniphyIOClocksReset, DatastormUniphyIODDR, datastorm_uniphy}
 
-case class XilinxNexysVideoMIGParams(
+case class AlteraDatastormUniphyParams(
   address : Seq[AddressSet]
 )
 
-class XilinxNexysVideoMIGPads(depth: BigInt) extends NexysVideoMIGIODDR(depth) {
-  def this(c : XilinxNexysVideoMIGParams) {
+class AlteraDatastormUniphyPads(depth : BigInt) extends DatastormUniphyIODDR(depth) {
+  def this(c : AlteraDatastormUniphyParams) {
     this(AddressRange.fromSets(c.address).head.size)
   }
 }
 
-class XilinxNexysVideoMIGIO(depth: BigInt) extends NexysVideoMIGIODDR(depth) with NexysVideoMIGIOClocksReset
+class AlteraDatastormUniphyIO(depth : BigInt) extends DatastormUniphyIODDR(depth) {
+  //pll refclk
+  val ddr_fpga_pll_ref_clk_clk = Input(Clock())
+  //mem calibration signals
+  val mem_status_local_init_done         = Output(Bool())
+  val mem_status_local_cal_success       = Output(Bool())
+  val mem_status_local_cal_fail          = Output(Bool())
 
-class XilinxNexysVideoMIGIsland(c: XilinxNexysVideoMIGParams, val crossing: ClockCrossingType = AsynchronousCrossing(8))(implicit p: Parameters) extends LazyModule with CrossesToOnlyOneClockDomain {
+}
+
+class AlteraDatastormUniphyIsland(c : AlteraDatastormUniphyParams)(implicit p: Parameters) extends LazyModule {
   val ranges = AddressRange.fromSets(c.address)
   require (ranges.size == 1, "DDR range must be contiguous")
   val offset = ranges.head.base
   val depth = ranges.head.size
-  require((depth<=0x20000000L),"nexysvideomig supports upto 512 MB depth configuraton")
+  require((depth<=0x40000000L),"datastorm_uniphy supports upto 1 GB depth configuraton")
   
   val device = new MemoryDevice
   val node = AXI4SlaveNode(Seq(AXI4SlavePortParameters(
@@ -41,53 +49,46 @@ class XilinxNexysVideoMIGIsland(c: XilinxNexysVideoMIGParams, val crossing: Cloc
     beatBytes = 8)))
 
   lazy val module = new Impl
-  class Impl extends LazyRawModuleImp(this) {
+  class Impl extends LazyModuleImp(this) {
     val io = IO(new Bundle {
-      val port = new XilinxNexysVideoMIGIO(depth)
+      val port = new AlteraDatastormUniphyIO(depth)
     })
-    override def provideImplicitClockToLazyChildren = true
-    childClock := io.port.ui_clk
-    childReset := io.port.ui_clk_sync_rst
 
     //MIG black box instantiation
-    val blackbox = Module(new nexysvideomig(depth))
+    val blackbox =  Module(new datastorm_uniphy(depth))
     val (axi_async, _) = node.in(0)
 
     //pins to top level
 
     //inouts
-    attach(io.port.ddr3_dq,blackbox.io.ddr3_dq)
-    attach(io.port.ddr3_dqs_n,blackbox.io.ddr3_dqs_n)
-    attach(io.port.ddr3_dqs_p,blackbox.io.ddr3_dqs_p)
+    attach(io.port.ddr3_mem_dq, blackbox.io.ddr3_mem_dq)
+    attach(io.port.ddr3_mem_dqs_n,blackbox.io.ddr3_mem_dqs_n)
+    attach(io.port.ddr3_mem_dqs,blackbox.io.ddr3_mem_dqs)
 
     //outputs
-    io.port.ddr3_addr         := blackbox.io.ddr3_addr
-    io.port.ddr3_ba           := blackbox.io.ddr3_ba
-    io.port.ddr3_ras_n        := blackbox.io.ddr3_ras_n
-    io.port.ddr3_cas_n        := blackbox.io.ddr3_cas_n
-    io.port.ddr3_we_n         := blackbox.io.ddr3_we_n
-    io.port.ddr3_reset_n      := blackbox.io.ddr3_reset_n
-    io.port.ddr3_ck_p         := blackbox.io.ddr3_ck_p
-    io.port.ddr3_ck_n         := blackbox.io.ddr3_ck_n
-    io.port.ddr3_cke          := blackbox.io.ddr3_cke
-    io.port.ddr3_dm           := blackbox.io.ddr3_dm
-    io.port.ddr3_odt          := blackbox.io.ddr3_odt
+    io.port.ddr3_mem_a            := blackbox.io.ddr3_mem_a
+    io.port.ddr3_mem_ba           := blackbox.io.ddr3_mem_ba
+    io.port.ddr3_mem_ras_n        := blackbox.io.ddr3_mem_ras_n
+    io.port.ddr3_mem_cas_n        := blackbox.io.ddr3_mem_cas_n
+    io.port.ddr3_mem_we_n         := blackbox.io.ddr3_mem_we_n
+    io.port.ddr3_mem_reset_n      := blackbox.io.ddr3_mem_reset_n
+    io.port.ddr3_mem_ck           := blackbox.io.ddr3_mem_ck
+    io.port.ddr3_mem_ck_n         := blackbox.io.ddr3_mem_ck_n
+    io.port.ddr3_mem_cke          := blackbox.io.ddr3_mem_cke
+    io.port.ddr3_mem_cs_n         := blackbox.io.ddr3_mem_cs_n
+    io.port.ddr3_mem_dm           := blackbox.io.ddr3_mem_dm
+    io.port.ddr3_mem_odt          := blackbox.io.ddr3_mem_odt
+
+    blackbox.io.oct_rzqin         := io.port.oct_rzqin
 
     //inputs
     //NO_BUFFER clock
-    blackbox.io.sys_clk_i     := io.port.sys_clk_i
-    blackbox.io.clk_ref_i     := io.port.clk_ref_i
+    blackbox.io.clk_clk     := clock
+    blackbox.io.ddr_fpga_pll_ref_clk_clk     := io.port.ddr_fpga_pll_ref_clk_clk
 
-    io.port.ui_clk            := blackbox.io.ui_clk
-    io.port.ui_clk_sync_rst   := blackbox.io.ui_clk_sync_rst
-    io.port.mmcm_locked       := blackbox.io.mmcm_locked
-    blackbox.io.aresetn       := io.port.aresetn
-    blackbox.io.app_sr_req    := false.B
-    blackbox.io.app_ref_req   := false.B
-    blackbox.io.app_zq_req    := false.B
-    //app_sr_active           := unconnected
-    //app_ref_ack             := unconnected
-    //app_zq_ack              := unconnected
+    io.port.mem_status_local_init_done     := blackbox.io.mem_status_local_init_done  
+    io.port.mem_status_local_cal_success   := blackbox.io.mem_status_local_cal_success
+    io.port.mem_status_local_cal_fail      := blackbox.io.mem_status_local_cal_fail   
 
     val awaddr = axi_async.aw.bits.addr - offset.U
     val araddr = axi_async.ar.bits.addr - offset.U
@@ -140,13 +141,11 @@ class XilinxNexysVideoMIGIsland(c: XilinxNexysVideoMIGParams, val crossing: Cloc
     axi_async.r.valid         := blackbox.io.s_axi_rvalid
 
     //misc
-    io.port.init_calib_complete := blackbox.io.init_calib_complete
-    blackbox.io.sys_rst       := io.port.sys_rst
-    //mig.device_temp         := unconnected
+    blackbox.io.reset_reset_n   := !reset.asBool
   }
 }
 
-class XilinxNexysVideoMIG(c: XilinxNexysVideoMIGParams, crossing: ClockCrossingType = AsynchronousCrossing(8))(implicit p: Parameters) extends LazyModule {
+class AlteraDatastormUniphy(c : AlteraDatastormUniphyParams)(implicit p: Parameters) extends LazyModule {
   val ranges = AddressRange.fromSets(c.address)
   val depth = ranges.head.size
 
@@ -155,33 +154,17 @@ class XilinxNexysVideoMIG(c: XilinxNexysVideoMIGParams, crossing: ClockCrossingT
   val indexer = LazyModule(new AXI4IdIndexer(idBits = 4))
   val deint   = LazyModule(new AXI4Deinterleaver(p(CacheBlockBytes)))
   val yank    = LazyModule(new AXI4UserYanker)
-  val island  = LazyModule(new XilinxNexysVideoMIGIsland(c, crossing))
+  val island  = LazyModule(new AlteraDatastormUniphyIsland(c))
 
   val node: TLInwardNode =
-    island.crossAXI4In(island.node) := yank.node := deint.node := indexer.node := toaxi4.node := buffer.node
+    island.node := yank.node := deint.node := indexer.node := toaxi4.node := buffer.node
 
   lazy val module = new Impl
   class Impl extends LazyModuleImp(this) {
     val io = IO(new Bundle {
-      val port = new XilinxNexysVideoMIGIO(depth)
+      val port = new AlteraDatastormUniphyIO(depth)
     })
 
     io.port <> island.module.io.port
   }
 }
-
-/*
-   Copyright 2016 SiFive, Inc.
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
-*/
