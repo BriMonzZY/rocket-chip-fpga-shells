@@ -1,34 +1,34 @@
-package sifive.fpgashells.devices.xilinx.xilinxvcu118mig
+package sifive.fpgashells.devices.xilinx.xilinxzcu102mig
 
 import chisel3._
 import chisel3.experimental.attach
 import freechips.rocketchip.amba.axi4._
+import org.chipsalliance.cde.config.Parameters
+import freechips.rocketchip.subsystem._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.prci._
-import freechips.rocketchip.subsystem._
 import freechips.rocketchip.tilelink._
-import org.chipsalliance.cde.config.Parameters
-import sifive.fpgashells.ip.xilinx.vcu118mig.{VCU118MIGIOClocksReset, VCU118MIGIODDR, vcu118mig}
+import sifive.fpgashells.ip.xilinx.zcu102mig.{ZCU102MIGIOClocksReset, ZCU102MIGIODDR, zcu102mig}
 
-case class XilinxVCU118MIGParams(
-  address : Seq[AddressSet]
+case class XilinxZCU102MIGParams(
+  address: Seq[AddressSet]
 )
 
-class XilinxVCU118MIGPads(depth : BigInt) extends VCU118MIGIODDR(depth) {
-  def this(c : XilinxVCU118MIGParams) {
+class XilinxZCU102MIGPads(depth: BigInt) extends ZCU102MIGIODDR(depth) {
+  def this(c: XilinxZCU102MIGParams) {
     this(AddressRange.fromSets(c.address).head.size)
   }
 }
 
-class XilinxVCU118MIGIO(depth : BigInt) extends VCU118MIGIODDR(depth) with VCU118MIGIOClocksReset
+class XilinxZCU102MIGIO(depth: BigInt) extends ZCU102MIGIODDR(depth) with ZCU102MIGIOClocksReset
 
-class XilinxVCU118MIGIsland(c : XilinxVCU118MIGParams)(implicit p: Parameters) extends LazyModule with CrossesToOnlyOneClockDomain {
+class XilinxZCU102MIGIsland(c: XilinxZCU102MIGParams)(implicit p: Parameters) extends LazyModule with CrossesToOnlyOneClockDomain {
   val ranges = AddressRange.fromSets(c.address)
   require (ranges.size == 1, "DDR range must be contiguous")
   val offset = ranges.head.base
   val depth = ranges.head.size
   val crossing = AsynchronousCrossing(8)
-  require((depth<=0x80000000L),"vcu118mig supports upto 2GB depth configuraton")
+  require((depth<=0x80000000L),"zcu102mig supports upto 2GB depth configuraton")
   
   val device = new MemoryDevice
   val node = AXI4SlaveNode(Seq(AXI4SlavePortParameters(
@@ -44,11 +44,11 @@ class XilinxVCU118MIGIsland(c : XilinxVCU118MIGParams)(implicit p: Parameters) e
   lazy val module = new Impl
   class Impl extends LazyModuleImp(this) {
     val io = IO(new Bundle {
-      val port = new XilinxVCU118MIGIO(depth)
+      val port = new XilinxZCU102MIGIO(depth)
     })
 
     //MIG black box instantiation
-    val blackbox = Module(new vcu118mig(depth))
+    val blackbox = Module(new zcu102mig(depth))
     val (axi_async, _) = node.in(0)
 
     //pins to top level
@@ -135,7 +135,7 @@ class XilinxVCU118MIGIsland(c : XilinxVCU118MIGParams)(implicit p: Parameters) e
   }
 }
 
-class XilinxVCU118MIG(c : XilinxVCU118MIGParams)(implicit p: Parameters) extends LazyModule {
+class XilinxZCU102MIG(c: XilinxZCU102MIGParams)(implicit p: Parameters) extends LazyModule {
   val ranges = AddressRange.fromSets(c.address)
   val depth = ranges.head.size
 
@@ -144,7 +144,7 @@ class XilinxVCU118MIG(c : XilinxVCU118MIGParams)(implicit p: Parameters) extends
   val indexer = LazyModule(new AXI4IdIndexer(idBits = 4))
   val deint   = LazyModule(new AXI4Deinterleaver(p(CacheBlockBytes)))
   val yank    = LazyModule(new AXI4UserYanker)
-  val island  = LazyModule(new XilinxVCU118MIGIsland(c))
+  val island  = LazyModule(new XilinxZCU102MIGIsland(c))
 
   val node: TLInwardNode =
     island.crossAXI4In(island.node) := yank.node := deint.node := indexer.node := toaxi4.node := buffer.node
@@ -152,7 +152,7 @@ class XilinxVCU118MIG(c : XilinxVCU118MIGParams)(implicit p: Parameters) extends
   lazy val module = new Impl
   class Impl extends LazyModuleImp(this) {
     val io = IO(new Bundle {
-      val port = new XilinxVCU118MIGIO(depth)
+      val port = new XilinxZCU102MIGIO(depth)
     })
 
     io.port <> island.module.io.port
